@@ -7,13 +7,12 @@
 # ------------------------
 BUILDING_FLOORS = 15  # total number of floors
 BUILDING_FLOOR_HEIGHT = 3.5  # meters between adjacent floors
-ELEVATOR_COUNT = 1  # number of elevators
+ELEVATOR_COUNT = 4  # number of elevators
 ELEVATOR_CAPACITY = 1200.0  # kg, maximum allowed load
 
 # ------------------------
 # Kinematic Parameters
 # ------------------------
-g = 9.81  # N/m
 KIN_MAX_SPEED_UP_EMPTY = 3.0  # m/s, upward, no load
 KIN_MAX_SPEED_UP_FULL = 2.5  # m/s, upward, full load
 KIN_MAX_SPEED_DOWN_EMPTY = 3.0  # m/s, downward, no load
