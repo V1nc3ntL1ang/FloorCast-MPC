@@ -1,11 +1,7 @@
 from models.baseline import assign_requests_baseline, simulate_baseline
 from models.objective import compute_objective
 from models.request import generate_requests_day
-from models.utils import (
-    log_results_to_file,
-    plot_elevator_movements,
-    print_elevator_queues,
-)
+from models.utils import log_results, plot_elevator_movements, print_elevator_queues
 from models.variables import ElevatorState
 import config as cfg
 
@@ -26,7 +22,7 @@ def main():
     print_elevator_queues(elevators)
 
     if cfg.SIM_ENABLE_LOG:
-        log_results_to_file(elevators, total_time, total_energy, total_cost)
+        log_results(elevators, total_time, total_energy, total_cost)
 
     if cfg.SIM_ENABLE_PLOTS:
         plot_elevator_movements(elevators)

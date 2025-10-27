@@ -9,7 +9,7 @@ from models.utils import duration_seconds, h2s
 # ------------------------
 BUILDING_FLOORS = 15  # 总楼层数 / total number of floors
 BUILDING_FLOOR_HEIGHT = 3.5  # 单层高度 (m) / floor height in meters
-ELEVATOR_COUNT = 4  # 电梯数量 / number of elevators
+ELEVATOR_COUNT = 5  # 电梯数量 / number of elevators
 ELEVATOR_CAPACITY = 1200.0  # 额定载荷 (kg) / rated payload
 
 # ------------------------
@@ -47,11 +47,11 @@ ENERGY_STANDBY_POWER = 500.0  # 待机功率 (W) / standby power draw
 # ------------------------
 # Simulation Parameters / 仿真控制
 # ------------------------
-SIM_TIME_HORIZON = 300  # 仿真总时长 (s) / simulation horizon
+SIM_TIME_HORIZON = 360  # 仿真总时长 (s) / simulation horizon
 SIM_TIME_STEP = 1.0  # 时间步长 (s) / integration step
 SIM_RANDOM_SEED = 42  # 随机种子 / random seed
 SIM_TOTAL_REQUESTS = 1000  # 每日请求总量 / number of generated requests
-SIM_ENABLE_PLOTS = False  # 是否输出图像 / enable plot export
+SIM_ENABLE_PLOTS = True  # 是否输出图像 / enable plot export
 SIM_ENABLE_LOG = True  # 是否写入日志 / enable log export
 
 # ------------------------

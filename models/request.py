@@ -161,4 +161,9 @@ def generate_requests_day(total_requests: int):
 
     # 统一按到达时间排序 / merge and sort by arrival time
     requests = sorted(morning + day + evening + night, key=lambda r: r.arrival_time)
+
+    # 统一重新编号，确保请求 ID 唯一 / reindex IDs to guarantee uniqueness.
+    for new_id, req in enumerate(requests, start=1):
+        req.id = new_id
+
     return requests

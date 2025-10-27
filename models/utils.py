@@ -151,35 +151,6 @@ def print_elevator_queues(elevators):
     print("========================\n")
 
 
-def _write_basic_summary(
-    elevators,
-    total_time,
-    total_energy,
-    total_cost,
-    filename="results/plots/summary.txt",
-):
-    """Write legacy summary file for compatibility / 输出兼容用 summary.txt。"""
-    ensure_directory(os.path.dirname(filename))
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write("=== Elevator Baseline Simulation Summary ===\n")
-        f.write(f"Total Time: {total_time:.2f} s\n")
-        f.write(f"Total Energy: {total_energy:.2f} J\n")
-        f.write(f"Total Objective Cost: {total_cost:.2f}\n\n")
-
-        for elev in elevators:
-            f.write(f"Elevator {elev.id} Queue:\n")
-            if not elev.served_requests:
-                f.write("  (No requests)\n")
-            else:
-                for req in elev.served_requests:
-                    f.write(
-                        f"  Req#{req.id}: {req.origin} → {req.destination}, load={req.load:.1f}kg\n"
-                    )
-            f.write("\n")
-
-    print(f"[Log Saved] Summary written to {filename}")
-
-
 def _format_time(value):
     """Pretty-print time value / 时间值格式化。"""
     return f"{value:.1f}s" if value is not None else "N/A"
@@ -197,11 +168,9 @@ def log_results(
     total_cost,
     *,
     outdir="results/summary",
-    basic_summary_path="results/plots/summary.txt",
 ):
     """
     Enhanced logging with per-elevator/per-request views / 输出增强日志（按电梯与按请求）。
-    同时保留传统 summary.txt 以保持兼容。
     """
     ensure_directory(outdir)
 
@@ -290,31 +259,3 @@ def log_results(
             )
 
     print(f"[Log Saved] Request summary → {by_request_path}")
-
-    _write_basic_summary(
-        elevators,
-        total_time,
-        total_energy,
-        total_cost,
-        filename=basic_summary_path,
-    )
-
-
-def log_results_to_file(
-    elevators,
-    total_time,
-    total_energy,
-    total_cost,
-    filename="results/plots/summary.txt",
-):
-    """
-    Backward-compatible logging helper / 兼容旧接口的日志封装。
-    """
-    log_results(
-        elevators,
-        total_time,
-        total_energy,
-        total_cost,
-        outdir="results/summary",
-        basic_summary_path=filename,
-    )
