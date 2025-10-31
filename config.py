@@ -47,10 +47,10 @@ ENERGY_STANDBY_POWER = 500.0  # 待机功率 (W) / standby power draw
 # ------------------------
 # Simulation Parameters / 仿真控制
 # ------------------------
-SIM_TIME_HORIZON = 360  # 仿真总时长 (s) / simulation horizon
+SIM_TIME_HORIZON = 86400  # 仿真总时长 (s) / simulation horizon
 SIM_TIME_STEP = 1.0  # 时间步长 (s) / integration step
 SIM_RANDOM_SEED = 42  # 随机种子 / random seed
-SIM_TOTAL_REQUESTS = 1000  # 每日请求总量 / number of generated requests
+SIM_TOTAL_REQUESTS = 5000  # 每日请求总量 / number of generated requests
 SIM_ENABLE_PLOTS = True  # 是否输出图像 / enable plot export
 SIM_ENABLE_LOG = True  # 是否写入日志 / enable log export
 
@@ -70,8 +70,16 @@ PEAK_EVENING_MU_RATIO = 0.7  # 晚高峰中心 (占比) / evening peak position
 # ------------------------
 # Objective Weights / 目标函数权重
 # ------------------------
-WEIGHT_TIME = 1.0  # 时间权重 / weight on total time
-WEIGHT_ENERGY = 0.001  # 能耗权重 / weight on total energy
+WEIGHT_TIME = 1  # 时间权重 / weight on total time
+WEIGHT_ENERGY = 0.0001  # 能耗权重 / weight on total energy
+WAIT_PENALTY_SCALE = 90.0  # 等待惩罚尺度 (s) / scale for wait-time penalty growth
+WAIT_PENALTY_EXPONENT = 2  # 等待惩罚指数 (>1) / curvature for wait-time penalty
+WAIT_PENALTY_THRESHOLD = (
+    90.0  # 等待惩罚阈值 (s) / threshold before super-linear penalty kicks in
+)
+EMPTYLOAD_PENALTY_MULTIPLIER = (
+    2.0  # 空载能耗惩罚倍数 / multiplier for empty-run energy weight
+)
 
 # ============================================================
 # Request Generation Parameters (Detailed) / 请求生成细节

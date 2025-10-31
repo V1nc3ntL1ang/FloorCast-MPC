@@ -104,7 +104,7 @@ def plot_elevator_movements(
         return
 
     ensure_directory(os.path.dirname(filename))
-    plt.figure(figsize=(16, 10))
+    plt.figure(figsize=(20, 10))
     colors = ["C0", "C1", "C2", "C3", "C4", "C5"]
 
     for i, elev in enumerate(elevators):
@@ -160,7 +160,7 @@ def plot_elevator_movements_time(
         return
 
     ensure_directory(os.path.dirname(filename))
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(20, 10))
     colors = ["C0", "C1", "C2", "C3", "C4", "C5"]
 
     for i, elev in enumerate(elevators):
@@ -269,11 +269,13 @@ def _format_table(value, width):
 def log_results(
     elevators,
     system_time,
-    total_energy,
-    total_cost,
+    running_energy,
+    objective_breakdown,
     passenger_total_time,
     passenger_wait_time,
     passenger_in_cab_time,
+    passenger_wait_penalty,
+    emptyload_energy,
     *,
     outdir="/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/summary",
 ):
@@ -285,13 +287,25 @@ def log_results(
         f.write("=== Elevator Service Summary (by Elevator) ===\n")
         f.write(f"Generated at: {datetime.now()}\n")
         f.write(f"System Active Time: {system_time:.2f} s\n")
-        f.write(f"Total Energy: {total_energy:.2f} J\n")
+        f.write(f"Total Energy (running): {running_energy:.2f} J\n")
         f.write(
             "Passenger Time: {:.2f} s (wait {:.2f} s | in-cab {:.2f} s)\n".format(
                 passenger_total_time, passenger_wait_time, passenger_in_cab_time
             )
         )
-        f.write(f"Total Objective Cost: {total_cost:.2f}\n\n")
+        f.write(f"Aggregated Wait Penalty: {passenger_wait_penalty:.2f}\n")
+        f.write(f"Empty-load Energy: {emptyload_energy:.2f} J\n")
+        f.write("Objective Cost Breakdown:\n")
+        f.write(
+            "  Total: {total:.2f} | Wait: {wait:.2f} | Ride: {ride:.2f} | "
+            "Running Energy: {run:.2f} | Empty-load Surcharge: {empty:.2f}\n\n".format(
+                total=objective_breakdown.total_cost,
+                wait=objective_breakdown.wait_cost,
+                ride=objective_breakdown.ride_cost,
+                run=objective_breakdown.running_energy_cost,
+                empty=objective_breakdown.emptyload_energy_cost,
+            )
+        )
 
         for elev in elevators:
             f.write(

@@ -95,10 +95,14 @@ def assign_requests_greedy(requests, elevators):
 
 
 def simulate_dispatch(elevators):
-    """Simulate greedy single-elevator batches and return (total_time, total_energy)."""
+    """
+    Simulate greedy single-elevator batches and return
+    (total_time, total_energy, served_requests, emptyload_energy).
+    """
 
     total_time = 0.0
     total_energy = 0.0
+    emptyload_energy = 0.0
 
     for elev in elevators:
         current_floor = elev.floor
@@ -131,7 +135,7 @@ def simulate_dispatch(elevators):
         def travel_between(start_floor, end_floor):
             """Advance simulation clock and energy for an inter-floor trip."""
 
-            nonlocal current_floor, current_time, total_time, total_energy
+            nonlocal current_floor, current_time, total_time, total_energy, emptyload_energy
 
             if start_floor == end_floor:
                 return
@@ -147,6 +151,9 @@ def simulate_dispatch(elevators):
             total_time += travel_duration
             total_energy += energy_motion + energy_idle
             current_floor = end_floor
+
+            if load <= 1e-9:
+                emptyload_energy += energy_motion + energy_idle
 
             pull_ready_requests()
 
@@ -338,4 +345,4 @@ def simulate_dispatch(elevators):
     for elev in elevators:
         all_served.extend(elev.served_requests)
 
-    return total_time, total_energy, all_served
+    return total_time, total_energy, all_served, emptyload_energy
