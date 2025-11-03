@@ -34,7 +34,7 @@ def segment_energy(load, distance, direction="up"):
         d_dec = v_peak**2 / (2.0 * a_dec)
         d_const = max(distance - d_acc - d_dec, 0.0)
 
-    M_eq = cfg.ENERGY_CAR_MASS + load  # 等效运动质量 M0 + γL，此处取 γ=1
+    M_eq = cfg.ENERGY_CAR_MASS + load  # 等效运动质量 M0 + γL，此处取 γ=1 / equivalent moving mass.
     delta_mass = (cfg.ENERGY_CAR_MASS + load) - cfg.ENERGY_COUNTERWEIGHT_MASS
     sign = 1 if direction == "up" else -1
     friction = cfg.ENERGY_FRICTION_PER_METER

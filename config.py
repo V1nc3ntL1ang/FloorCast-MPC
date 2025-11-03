@@ -72,14 +72,20 @@ PEAK_EVENING_MU_RATIO = 0.7  # 晚高峰中心 (占比) / evening peak position
 # ------------------------
 WEIGHT_TIME = 1  # 时间权重 / weight on total time
 WEIGHT_ENERGY = 0.0001  # 能耗权重 / weight on total energy
-WAIT_PENALTY_SCALE = 90.0  # 等待惩罚尺度 (s) / scale for wait-time penalty growth
-WAIT_PENALTY_EXPONENT = 2  # 等待惩罚指数 (>1) / curvature for wait-time penalty
+WAIT_PENALTY_SCALE = 30.0  # 等待惩罚尺度 (s) / scale for wait-time penalty growth
+WAIT_PENALTY_EXPONENT = 2.5  # 等待惩罚指数 (>1) / curvature for wait-time penalty
 WAIT_PENALTY_THRESHOLD = (
-    90.0  # 等待惩罚阈值 (s) / threshold before super-linear penalty kicks in
+    30.0  # 等待惩罚阈值 (s) / threshold before super-linear penalty kicks in
 )
 EMPTYLOAD_PENALTY_MULTIPLIER = (
-    2.0  # 空载能耗惩罚倍数 / multiplier for empty-run energy weight
+    3.0  # 空载能耗惩罚倍数 / multiplier for empty-run energy weight
 )
+
+# ------------------------
+# MPC Scheduler Parameters / MPC 调度器参数
+# ------------------------
+MPC_LOOKAHEAD_WINDOW = 240.0  # MPC 预测窗口长度 (s) / default look-ahead horizon
+MPC_MAX_BATCH = 12  # MPC 最大批处理请求数 / max batched requests per solve
 
 # ============================================================
 # Request Generation Parameters (Detailed) / 请求生成细节

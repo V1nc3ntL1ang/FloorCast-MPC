@@ -5,18 +5,18 @@ from models.energy import segment_energy, standby_energy
 
 
 def assign_requests_greedy(requests, elevators):
-    """Assign requests greedily considering earliest availability for each elevator."""
+    """Assign requests greedily considering earliest availability / 按最早可用时间贪婪分配请求。"""
 
-    # Reset assignment containers on each elevator state.
+    # Reset assignment containers / 重置每部电梯的任务容器。
     for e in elevators:
         e.queue = []
         e.served_requests = []
 
-    # Tracks each elevator's projected state after scheduled jobs.
+    # Track projected state after scheduling / 记录排程后的预计状态。
     projected_floor = {e.id: e.floor for e in elevators}
     projected_time = {e.id: 0.0 for e in elevators}
     num_elevators = len(elevators)
-    tie_cursor = 0  # ring pointer used for tiebreaks / 环状指针用于平局处理
+    tie_cursor = 0  # ring pointer for tiebreaks / 环状指针用于平局处理
     eps = 1e-6
 
     for req in sorted(requests, key=lambda r: r.arrival_time):
@@ -96,8 +96,8 @@ def assign_requests_greedy(requests, elevators):
 
 def simulate_dispatch(elevators):
     """
-    Simulate greedy single-elevator batches and return
-    (total_time, total_energy, served_requests, emptyload_energy).
+    Simulate greedy batches per elevator and return metrics /
+    按电梯模拟贪婪批处理并返回统计量 (total_time, total_energy, served_requests, emptyload_energy)。
     """
 
     total_time = 0.0
@@ -123,7 +123,7 @@ def simulate_dispatch(elevators):
         service_log = []
 
         def pull_ready_requests():
-            """Move arrived pending requests into the waiting list."""
+            """Move arrived pending requests into the waiting list / 将已到达请求移入等待队列。"""
 
             nonlocal pending, waiting
             while pending and pending[0].arrival_time <= current_time:
@@ -133,7 +133,7 @@ def simulate_dispatch(elevators):
             return sum(req.load for req in onboard)
 
         def travel_between(start_floor, end_floor):
-            """Advance simulation clock and energy for an inter-floor trip."""
+            """Advance time and energy for a trip / 更新跨层行程的时间与能耗。"""
 
             nonlocal current_floor, current_time, total_time, total_energy, emptyload_energy
 
@@ -165,7 +165,7 @@ def simulate_dispatch(elevators):
             return "idle"
 
         def process_stop(boarders, leavers):
-            """Handle dwell time, boarding, and alighting at the current floor."""
+            """Handle dwell time, boarding, and alighting / 处理开门、上客与下客。"""
 
             nonlocal current_time, total_time, total_energy
 
@@ -174,9 +174,9 @@ def simulate_dispatch(elevators):
 
             leaving_weight = sum(
                 req.load for req in leavers if req in onboard
-            )  # weight exiting
+            )  # weight exiting / 下客重量
 
-            # Ensure capacity compliance before boarding new entities.
+            # Ensure capacity compliance before boarding / 确保上客前满足载荷限制。
             post_leave_load = max(0.0, current_load() - leaving_weight)
             remaining_capacity = max(0.0, cfg.ELEVATOR_CAPACITY - post_leave_load)
 
@@ -186,7 +186,7 @@ def simulate_dispatch(elevators):
                     if req.load <= remaining_capacity + 1e-9:
                         admitted.append(req)
                         remaining_capacity -= req.load
-                    # Requests beyond capacity remain in the waiting queue.
+                    # Requests beyond capacity remain waiting / 超载请求保留在等待队列。
                 boarders = admitted
 
             arrive_time = current_time

@@ -1,7 +1,16 @@
+import math
 import os
 import random
 from datetime import datetime
-from typing import Tuple
+from typing import Sequence, Tuple
+
+
+DEFAULT_PLOT_DIR = (
+    "/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/plots"
+)
+DEFAULT_SUMMARY_DIR = (
+    "/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/summary"
+)
 
 
 def h2s(hour, minute: int = 0) -> float:
@@ -81,14 +90,14 @@ def ensure_directory(path: str):
 
 def plot_elevator_movements(
     elevators,
-    filename="/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/plots/elevator_schedule.png",
+    filename=os.path.join(DEFAULT_PLOT_DIR, "elevator_schedule.png"),
 ):
     """
-    Plot elevator service schedule (floor vs. task index) / 绘制电梯服务序列（楼层-任务索引）。
-    每部电梯的服务顺序依次展示。
+    Plot elevator service schedule (floor vs. task index) /
+    绘制电梯服务序列（楼层-任务索引），展示各电梯执行顺序。
     """
     try:
-        # Limit BLAS/OpenMP threads to keep sandbox稳定
+        # Limit BLAS/OpenMP threads / 限制 BLAS 与 OpenMP 线程数量以保持运行稳定。
         os.environ.setdefault("OMP_NUM_THREADS", "1")
         os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
         os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -139,9 +148,9 @@ def plot_elevator_movements(
 
 def plot_elevator_movements_time(
     elevators,
-    filename="/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/plots/elevator_schedule_time.png",
+    filename=os.path.join(DEFAULT_PLOT_DIR, "elevator_schedule_time.png"),
 ):
-    """Plot elevator services with time on the horizontal axis."""
+    """Plot elevator services over time / 绘制以时间为横轴的电梯运行轨迹。"""
 
     try:
         os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -239,6 +248,65 @@ def plot_elevator_movements_time(
     print(f"[Plot Saved] Elevator timeline plot saved to: {filename}")
 
 
+def plot_wait_distribution(
+    wait_data: Sequence[Tuple[str, Sequence[float]]],
+    filename=os.path.join(DEFAULT_PLOT_DIR, "wait_distribution.png"),
+) -> None:
+    """
+    Plot wait-time histograms for multiple strategies / 绘制多策略等待时间分布直方图。
+    wait_data expects (label, waits) pairs / 输入为 (策略名称, 等待时间序列)。
+    """
+    try:
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+        os.environ.setdefault("KMP_AFFINITY", "disabled")
+
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as exc:
+        print(f"[Plot Skipped] {exc}")
+        return
+
+    series = [
+        (label, [w for w in waits if w is not None]) for label, waits in wait_data
+    ]
+    series = [(label, waits) for label, waits in series if waits]
+
+    if not series:
+        print("[Plot Skipped] No wait-time data available.")
+        return
+
+    ensure_directory(os.path.dirname(filename))
+    plt.figure(figsize=(12, 6))
+
+    total_samples = sum(len(waits) for _, waits in series)
+    bins = max(10, min(60, int(math.sqrt(total_samples))))
+
+    for label, waits in series:
+        plt.hist(
+            waits,
+            bins=bins,
+            alpha=0.6,
+            label=label,
+            edgecolor="black",
+            linewidth=0.4,
+        )
+
+    plt.xlabel("Wait Time (s)")
+    plt.ylabel("Frequency")
+    plt.title("Passenger Wait Time Distribution by Strategy")
+    plt.legend()
+    plt.grid(True, axis="y", linestyle="--", alpha=0.4)
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
+    print(f"[Plot Saved] Wait-time distribution saved to: {filename}")
+
+
 def print_elevator_queues(elevators):
     """
     Print served requests for each elevator / 输出各电梯的服务队列。
@@ -276,13 +344,23 @@ def log_results(
     passenger_in_cab_time,
     passenger_wait_penalty,
     emptyload_energy,
+    theoretical_breakdown,
+    theoretical_in_cab_time,
+    theoretical_running_energy,
+    theoretical_wait_time,
+    theoretical_wait_penalty,
     *,
-    outdir="/home/v1nc3nt/WinDesktop/SCUT/作业/优化方法/LoadAwareElevator/results/summary",
+    strategy_label: str | None = None,
+    outdir: str | None = None,
 ):
     """Enhanced logging with per-elevator/per-request views / 输出增强日志（按电梯与按请求）。"""
-    ensure_directory(outdir)
+    target_dir = outdir or DEFAULT_SUMMARY_DIR
+    if strategy_label:
+        target_dir = os.path.join(target_dir, f"strategy_{strategy_label}")
 
-    by_elevator_path = os.path.join(outdir, "summary_by_elevator.txt")
+    ensure_directory(target_dir)
+
+    by_elevator_path = os.path.join(target_dir, "summary_by_elevator.txt")
     with open(by_elevator_path, "w", encoding="utf-8") as f:
         f.write("=== Elevator Service Summary (by Elevator) ===\n")
         f.write(f"Generated at: {datetime.now()}\n")
@@ -291,6 +369,18 @@ def log_results(
         f.write(
             "Passenger Time: {:.2f} s (wait {:.2f} s | in-cab {:.2f} s)\n".format(
                 passenger_total_time, passenger_wait_time, passenger_in_cab_time
+            )
+        )
+        f.write("Best-case (idealized) reference:\n")
+        f.write(
+            "  Wait: {wait:.2f} s (penalty {penalty:.2f}) | "
+            "In-cab: {time:.2f} s | Energy: {energy:.2f} J | "
+            "Cost: {cost:.2f}\n\n".format(
+                wait=theoretical_wait_time,
+                penalty=theoretical_wait_penalty,
+                time=theoretical_in_cab_time,
+                energy=theoretical_running_energy,
+                cost=theoretical_breakdown.total_cost,
             )
         )
         f.write(f"Aggregated Wait Penalty: {passenger_wait_penalty:.2f}\n")
@@ -367,7 +457,7 @@ def log_results(
 
     all_requests.sort(key=lambda x: x[1].arrival_time)
 
-    by_request_path = os.path.join(outdir, "summary_by_request.txt")
+    by_request_path = os.path.join(target_dir, "summary_by_request.txt")
     with open(by_request_path, "w", encoding="utf-8") as f:
         f.write("=== Request Timeline Summary (by Request) ===\n")
         f.write(f"Generated at: {datetime.now()}\n")

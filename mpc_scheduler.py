@@ -1,8 +1,6 @@
 """
-Rolling-horizon (MPC-lite) scheduler that assigns requests to elevators without
-requiring external optimizers. The planner evaluates short-horizon batches of
-pending requests and greedily assigns the lowest incremental cost pair, where
-cost blends passenger time and estimated energy.
+Rolling-horizon (MPC-lite) scheduler without external solvers /
+滚动时域（轻量 MPC）调度器，在不依赖外部求解器的情况下，为电梯分配请求。
 """
 
 from __future__ import annotations
@@ -16,8 +14,8 @@ from models.kinematics import travel_time
 from models.temporal import hold_time
 
 
-MPC_LOOKAHEAD_WINDOW = getattr(cfg, "MPC_LOOKAHEAD_WINDOW", 600.0)
-MPC_MAX_BATCH = getattr(cfg, "MPC_MAX_BATCH", 32)
+MPC_LOOKAHEAD_WINDOW = getattr(cfg, "MPC_LOOKAHEAD_WINDOW", 240.0)
+MPC_MAX_BATCH = getattr(cfg, "MPC_MAX_BATCH", 12)
 
 
 @dataclass
@@ -34,16 +32,15 @@ def assign_requests_mpc(
     max_batch: int | None = None,
 ) -> None:
     """
-    Assign each request to an elevator using a rolling-horizon cost heuristic.
+    Assign requests using a rolling-horizon heuristic /
+    采用滚动时域启发式将请求分配给电梯。
 
-    Parameters
-    ----------
+    Parameters / 参数
+    -----------------
     lookahead_window:
-        Maximum time (seconds) beyond the earliest unassigned arrival considered
-        in each batch. Defaults to `MPC_LOOKAHEAD_WINDOW`.
+        Maximum seconds beyond earliest unassigned arrival / 视窗长度（秒）。
     max_batch:
-        Maximum number of candidate requests considered per iteration. Defaults
-        to `MPC_MAX_BATCH`.
+        Maximum candidate requests per iteration / 每轮评估的候选请求数。
     """
     if not elevators:
         return
@@ -109,7 +106,7 @@ def assign_requests_mpc(
                     best_choice = (idx, elev.id, passenger_time, finish_time)
 
         if best_choice is None:
-            # Fallback: assign to the least-busy elevator to avoid stalling.
+            # Fallback to least-busy elevator / 回退到最空闲电梯以避免停滞。
             idx = candidate_indices[0]
             req = unassigned.pop(idx)
             target_id = min(plans, key=lambda eid: plans[eid].time)
@@ -132,7 +129,7 @@ def assign_requests_mpc(
 def _estimate_incremental_cost(
     plan: _PlanState, request: object
 ) -> Tuple[float, float, float] | None:
-    """Return (total_cost, finish_time, passenger_time) for appending `request`."""
+    """Return (total_cost, finish_time, passenger_time) / 返回追加请求后的成本和完成时间。"""
     current_floor = plan.floor
     available_time = plan.time
     origin = request.origin
@@ -164,7 +161,7 @@ def _estimate_incremental_cost(
         energy += standby_energy(travel_to_dest)
 
     total_cost = cfg.WEIGHT_TIME * passenger_time + cfg.WEIGHT_ENERGY * energy
-    # Small bias to keep schedules smooth when costs tie.
+    # Small bias for smoother schedules when tied / 在成本相同时加入轻微偏置以保持平滑。
     total_cost += 1e-6 * finish_time
 
     return total_cost, finish_time, passenger_time
