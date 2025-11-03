@@ -61,6 +61,8 @@ def assign_requests_mpc(
     plans = {elev.id: _PlanState(floor=elev.floor, time=0.0) for elev in elevators}
     elevator_lookup = {elev.id: elev for elev in elevators}
     eps = 1e-9
+    num_elevators = len(elevators)
+    tie_cursor = 0
 
     while unassigned:
         earliest_arrival = unassigned[0].arrival_time
@@ -78,38 +80,26 @@ def assign_requests_mpc(
         if not candidate_indices:
             candidate_indices = list(range(min(batch_limit, len(unassigned))))
 
-        best_choice: Tuple[int, int, float, float] | None = None
-        best_cost: float | None = None
-
+        candidate_options: List[Tuple[float, float, float, int, int, int]] = []
         for idx in candidate_indices:
             req = unassigned[idx]
-            for elev in elevators:
+            for elev_idx, elev in enumerate(elevators):
                 estimate = _estimate_incremental_cost(plans[elev.id], req)
                 if estimate is None:
                     continue
                 cost, finish_time, passenger_time = estimate
+                candidate_options.append(
+                    (cost, finish_time, passenger_time, idx, elev.id, elev_idx)
+                )
 
-                if (
-                    best_cost is None
-                    or cost < best_cost - eps
-                    or (
-                        abs(cost - best_cost) <= eps
-                        and finish_time < best_choice[3] - eps
-                    )
-                    or (
-                        abs(cost - best_cost) <= eps
-                        and abs(finish_time - best_choice[3]) <= eps
-                        and passenger_time < best_choice[2]
-                    )
-                ):
-                    best_cost = cost
-                    best_choice = (idx, elev.id, passenger_time, finish_time)
-
-        if best_choice is None:
+        if not candidate_options:
             # Fallback to least-busy elevator / 回退到最空闲电梯以避免停滞。
             idx = candidate_indices[0]
             req = unassigned.pop(idx)
             target_id = min(plans, key=lambda eid: plans[eid].time)
+            target_index = next(
+                (i for i, e in enumerate(elevators) if e.id == target_id), 0
+            )
             estimate = _estimate_incremental_cost(plans[target_id], req)
             finish_time = plans[target_id].time
             if estimate is not None:
@@ -117,13 +107,36 @@ def assign_requests_mpc(
             _apply_assignment(elevator_lookup[target_id], req)
             plans[target_id].time = finish_time
             plans[target_id].floor = req.destination
+            tie_cursor = (target_index + 1) % num_elevators
             continue
 
-        idx, elevator_id, _, finish_time = best_choice
+        min_cost = min(option[0] for option in candidate_options)
+        best_cost_options = [
+            opt for opt in candidate_options if opt[0] <= min_cost + eps
+        ]
+        min_finish = min(opt[1] for opt in best_cost_options)
+        best_finish_options = [
+            opt for opt in best_cost_options if opt[1] <= min_finish + eps
+        ]
+        min_passenger = min(opt[2] for opt in best_finish_options)
+        tied_options = [
+            opt for opt in best_finish_options if opt[2] <= min_passenger + eps
+        ]
+
+        selected_option = min(
+            tied_options,
+            key=lambda opt: ((opt[5] - tie_cursor) % num_elevators, opt[5]),
+        )
+        tie_used = len(tied_options) > 1
+
+        idx, elevator_id = selected_option[3], selected_option[4]
+        finish_time = selected_option[1]
         req = unassigned.pop(idx)
         _apply_assignment(elevator_lookup[elevator_id], req)
         plans[elevator_id].time = finish_time
         plans[elevator_id].floor = req.destination
+        if tie_used:
+            tie_cursor = (selected_option[5] + 1) % num_elevators
 
 
 def _estimate_incremental_cost(

@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+import heapq
 import math
 
 import config as cfg
-from models.energy import segment_energy, standby_energy
+from models.energy import segment_energy
 from models.kinematics import travel_time
 
 
@@ -139,93 +140,104 @@ def compute_objective(
     )
 
 
+def _srpt_flow_lb_speed_c(jobs, c: int) -> float:
+    """
+    jobs: list[(arrival_time, service_amount)] with time units aligned to travel_time
+    c: total service rate (= number of elevators)
+    returns: FLOW_LB = ∫ N(t) dt under SRPT on a speed-c preemptive single server
+    """
+    if not jobs:
+        return 0.0
+    jobs = sorted((float(a), float(s)) for a, s in jobs)
+    i, n = 0, len(jobs)
+    t = jobs[0][0]
+    N = 0
+    FLOW_LB = 0.0
+    # heap of (remaining_service, arrival_time)
+    heap = []
+    service_rate = max(float(c), 1e-9)
+    while i < n or heap:
+        if not heap and i < n and t < jobs[i][0]:
+            t = jobs[i][0]
+        while i < n and jobs[i][0] <= t:
+            a, s = jobs[i]
+            heapq.heappush(heap, (s, a))
+            N += 1
+            i += 1
+        if not heap:
+            continue
+        s_rem, a_top = heap[0]
+        next_arrival = jobs[i][0] if i < n else math.inf
+        complete_time = t + s_rem / service_rate
+        if complete_time <= next_arrival:
+            dt = complete_time - t
+            FLOW_LB += N * dt
+            t = complete_time
+            heapq.heappop(heap)
+            N -= 1
+        else:
+            dt = next_arrival - t
+            FLOW_LB += N * dt
+            t = next_arrival
+            new_s = max(s_rem - service_rate * dt, 0.0)
+            heapq.heapreplace(heap, (new_s, a_top))
+    return max(FLOW_LB, 0.0)
+
+
 def compute_theoretical_limit(
     requests,
 ) -> tuple[ObjectiveBreakdown, float, float, float, float]:
     """
-    Estimate an M/D/c-inspired lower bound / 估计基于 M/D/c 模型的理论下界。
-    假设所有请求同时出现，仅计算乘坐时间与能耗，并对等待使用闭式近似。
+    SRPT-based lower bound consistent with compute_objective / 与 compute_objective
+    一致的 SRPT 理论下界，等待惩罚通过 Jensen 不等式估计总和下界。
     """
 
+    jobs = []
     total_in_cab_time = 0.0
-    total_running_energy = 0.0
-    durations = []
-    valid_requests = []
+    min_running_energy = 0.0  # 牵引能耗下界
 
     for req in requests:
         origin = getattr(req, "origin", None)
         destination = getattr(req, "destination", None)
-        load = getattr(req, "load", 0.0)
-
         if origin is None or destination is None or origin == destination:
             continue
 
-        duration = travel_time(load, origin, destination)
+        load = getattr(req, "load", 0.0)
+        arrival_time = getattr(req, "arrival_time", getattr(req, "arrival", 0.0))
+        ride_time = max(travel_time(load, origin, destination), 0.0)
+
+        total_in_cab_time += ride_time
+        jobs.append((arrival_time, ride_time))
+
         distance = abs(destination - origin) * cfg.BUILDING_FLOOR_HEIGHT
         direction = "up" if destination > origin else "down"
+        min_running_energy += segment_energy(load, distance, direction)
 
-        total_in_cab_time += duration
-        total_running_energy += segment_energy(load, distance, direction)
-        total_running_energy += standby_energy(duration)
-        durations.append(duration)
-        valid_requests.append(req)
-
-    nr = len(valid_requests)
-
-    if nr == 0:
-        wait_avg = 0.0
+    elevator_count = max(int(getattr(cfg, "ELEVATOR_COUNT", 1)), 1)
+    service_rate = max(float(elevator_count), 1e-9)
+    flow_lb = _srpt_flow_lb_speed_c(jobs, elevator_count)
+    total_service = sum(s for _, s in jobs)
+    wait_lower_bound = max(flow_lb - total_service / service_rate, 0.0)
+    job_count = len(jobs)
+    if job_count == 0:
+        wait_penalty_value = 0.0
     else:
-        tau_bar = sum(durations) / nr if durations else 0.0
-        horizon = max(getattr(cfg, "SIM_TIME_HORIZON", 0), 1e-6)
-        arrival_rate = nr / horizon
-        tau_bar = max(tau_bar, 1e-6)
-        ne = max(cfg.ELEVATOR_COUNT, 1)
-        service_capacity = ne / tau_bar
-        rho = (
-            min(arrival_rate * tau_bar / ne, 0.999999) if service_capacity > 0 else 1.0
-        )
+        avg_wait = wait_lower_bound / job_count
+        # Jensen lower bound: total penalty >= n * f(avg wait)
+        wait_penalty_value = job_count * wait_penalty(avg_wait)
 
-        if arrival_rate >= service_capacity:
-            wait_avg = tau_bar
-        else:
-            wait_avg = arrival_rate * (tau_bar**2) / (2.0 * ne * max(1.0 - rho, 1e-6))
-
-    total_wait_time = nr * wait_avg
-
-    if nr == 0 or wait_avg <= 0.0:
-        total_wait_penalty = 0.0
-    else:
-        scale = max(WAIT_PENALTY_SCALE, 1e-6)
-        exponent = max(WAIT_PENALTY_EXPONENT, 1.0)
-        threshold = max(WAIT_PENALTY_THRESHOLD, 0.0)
-        rate = 1.0 / max(wait_avg, 1e-9)
-        tail_factor = math.exp(-rate * threshold)
-        extra_term = tail_factor * math.gamma(exponent + 2.0) / (
-            (scale**exponent) * (rate ** (exponent + 1.0))
-        )
-        if not math.isfinite(extra_term) or extra_term < 0.0:
-            extra_term = 0.0
-        wait_penalty_avg = wait_avg + extra_term
-        total_wait_penalty = nr * wait_penalty_avg
-
-    wait_cost = cfg.WEIGHT_TIME * total_wait_penalty
-    ride_cost = cfg.WEIGHT_TIME * total_in_cab_time
-    running_energy_cost = cfg.WEIGHT_ENERGY * total_running_energy
-    emptyload_energy_cost = 0.0
-    total_cost = ride_cost + running_energy_cost
-
-    breakdown = ObjectiveBreakdown(
-        total_cost=total_cost,
-        wait_cost=wait_cost,
-        ride_cost=ride_cost,
-        running_energy_cost=running_energy_cost,
-        emptyload_energy_cost=emptyload_energy_cost,
+    breakdown = compute_objective(
+        wait_time=wait_lower_bound,
+        in_cab_time=total_in_cab_time,
+        emptyload_energy=0.0,
+        running_energy=min_running_energy,
+        wait_penalty_value=wait_penalty_value,
     )
 
     return (
         breakdown,
         total_in_cab_time,
-        total_running_energy,
-        total_wait_time,
-        total_wait_penalty,
+        min_running_energy,
+        wait_lower_bound,
+        wait_penalty_value,
     )

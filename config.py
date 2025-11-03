@@ -50,22 +50,25 @@ ENERGY_STANDBY_POWER = 500.0  # 待机功率 (W) / standby power draw
 SIM_TIME_HORIZON = 86400  # 仿真总时长 (s) / simulation horizon
 SIM_TIME_STEP = 1.0  # 时间步长 (s) / integration step
 SIM_RANDOM_SEED = 42  # 随机种子 / random seed
-SIM_TOTAL_REQUESTS = 5000  # 每日请求总量 / number of generated requests
-SIM_ENABLE_PLOTS = True  # 是否输出图像 / enable plot export
-SIM_ENABLE_LOG = True  # 是否写入日志 / enable log export
+WEEKDAY_TOTAL_REQUESTS = 5000  # 工作日每日请求总量 / weekday requests per day
+WEEKEND_TOTAL_REQUESTS = 3600  # 周末每日请求总量 / weekend requests per day
+SIM_ENABLE_PLOTS = False  # 是否输出图像 / enable plot export
+SIM_ENABLE_LOG = False  # 是否写入日志 / enable log export
 
 # ------------------------
-# Request Generation (Overview) / 请求生成概览
+# Request Generation (Weekday Overview) / 工作日请求生成概览
 # ------------------------
-OFFPEAK_MAIN_FLOW_RATIO = 0.8  # 涉及一楼的比例 / share of trips touching floor 1
-OFFPEAK_LOAD_MIN = 50  # 平峰负载下界 (kg) / off-peak payload min
-OFFPEAK_LOAD_MAX = 110  # 平峰负载上界 (kg) / off-peak payload max
+WEEKDAY_OFFPEAK_MAIN_FLOW_RATIO = (
+    0.8  # 涉及一楼的比例 / share of trips touching floor 1
+)
+WEEKDAY_OFFPEAK_LOAD_MIN = 50  # 平峰负载下界 (kg) / off-peak payload min
+WEEKDAY_OFFPEAK_LOAD_MAX = 110  # 平峰负载上界 (kg) / off-peak payload max
 
-PEAK_LOAD_MIN = 60  # 高峰负载下界 (kg) / peak payload min
-PEAK_LOAD_MAX = 150  # 高峰负载上界 (kg) / peak payload max
-PEAK_SIGMA_RATIO = 0.1  # 高峰标准差比 / std ratio relative to horizon
-PEAK_MORNING_MU_RATIO = 0.2  # 早高峰中心 (占比) / morning peak position
-PEAK_EVENING_MU_RATIO = 0.7  # 晚高峰中心 (占比) / evening peak position
+WEEKDAY_PEAK_LOAD_MIN = 60  # 高峰负载下界 (kg) / peak payload min
+WEEKDAY_PEAK_LOAD_MAX = 150  # 高峰负载上界 (kg) / peak payload max
+WEEKDAY_PEAK_SIGMA_RATIO = 0.1  # 高峰标准差比 / std ratio relative to horizon
+WEEKDAY_PEAK_MORNING_MU_RATIO = 0.2  # 早高峰中心 (占比) / morning peak position
+WEEKDAY_PEAK_EVENING_MU_RATIO = 0.7  # 晚高峰中心 (占比) / evening peak position
 
 # ------------------------
 # Objective Weights / 目标函数权重
@@ -100,95 +103,121 @@ DEFAULT_SIGMA_RATIO = 0.05  # 默认高斯标准差比 / default sigma ratio
 DEFAULT_INTENSITY = 1.0  # 默认强度系数 / intensity scaling
 
 # ============================================================
-# 1. 早高峰参数 (Gaussian) / Morning Peak Parameters
+# 1. Weekday 早高峰参数 (Gaussian) / Morning Peak Parameters
 # ============================================================
 
-MORNING_INTENSITY = 1.0  # 早高峰强度 / morning peak intensity
-MORNING_LOAD_MIN = 60  # 早高峰负载下界 (kg)
-MORNING_LOAD_MAX = 150  # 早高峰负载上界 (kg)
-MORNING_SIGMA_RATIO = 0.30  # 早高峰标准差比 / time spread ratio
+WEEKDAY_MORNING_INTENSITY = 1.0  # 早高峰强度 / morning peak intensity
+WEEKDAY_MORNING_LOAD_MIN = 60  # 早高峰负载下界 (kg)
+WEEKDAY_MORNING_LOAD_MAX = 150  # 早高峰负载上界 (kg)
+WEEKDAY_MORNING_SIGMA_RATIO = 0.30  # 早高峰标准差比 / time spread ratio
 
 # 三个比例之和应为 1.0 / ratios must sum to 1.0
-MORNING_RATIO_ORIGIN1 = 0.05  # 一楼出发比例 / upward trips from floor 1
-MORNING_RATIO_DEST1 = 0.90  # 抵达一楼比例 / down trips to floor 1
-MORNING_RATIO_OTHER = 0.10  # 楼层间流动 / inter-floor movement
+WEEKDAY_MORNING_RATIO_ORIGIN1 = 0.05  # 一楼出发比例 / upward trips from floor 1
+WEEKDAY_MORNING_RATIO_DEST1 = 0.90  # 抵达一楼比例 / down trips to floor 1
+WEEKDAY_MORNING_RATIO_OTHER = 0.10  # 楼层间流动 / inter-floor movement
 
 # ============================================================
-# 2. 白天平峰参数 (Uniform) / Daytime Off-Peak Parameters
+# 2. Weekday 白天平峰参数 (Uniform) / Daytime Off-Peak Parameters
 # ============================================================
 
-DAY_INTENSITY = 0.4  # 白天平峰强度 / daytime off-peak intensity
-DAY_LOAD_MIN = 50  # 白天平峰负载下界 (kg)
-DAY_LOAD_MAX = 110  # 白天平峰负载上界 (kg)
+WEEKDAY_DAY_INTENSITY = 0.4  # 白天平峰强度 / daytime off-peak intensity
+WEEKDAY_DAY_LOAD_MIN = 50  # 白天平峰负载下界 (kg)
+WEEKDAY_DAY_LOAD_MAX = 110  # 白天平峰负载上界 (kg)
 
-DAY_RATIO_ORIGIN1 = 0.45  # 一楼出发 (上行) / departures from floor 1
-DAY_RATIO_DEST1 = 0.45  # 抵达一楼 (下行) / arrivals to floor 1
-DAY_RATIO_OTHER = 0.10  # 楼层间往返 / inter-floor traffic
-
-# ============================================================
-# 3. 晚高峰参数 (Gaussian) / Evening Peak Parameters
-# ============================================================
-
-EVENING_INTENSITY = 1.0  # 晚高峰强度 / evening peak intensity
-EVENING_LOAD_MIN = 60  # 晚高峰负载下界 (kg)
-EVENING_LOAD_MAX = 150  # 晚高峰负载上界 (kg)
-EVENING_SIGMA_RATIO = 0.30  # 晚高峰标准差比 / time spread ratio
-
-EVENING_RATIO_ORIGIN1 = 0.90  # 一楼出发比例 / upward trips from floor 1
-EVENING_RATIO_DEST1 = 0.05  # 抵达一楼比例 / down trips to floor 1
-EVENING_RATIO_OTHER = 0.05  # 楼层间流动 / inter-floor movement
+WEEKDAY_DAY_RATIO_ORIGIN1 = 0.45  # 一楼出发 (上行) / departures from floor 1
+WEEKDAY_DAY_RATIO_DEST1 = 0.45  # 抵达一楼 (下行) / arrivals to floor 1
+WEEKDAY_DAY_RATIO_OTHER = 0.10  # 楼层间往返 / inter-floor traffic
 
 # ============================================================
-# 4. 夜间平峰参数 (Uniform) / Night Off-Peak Parameters
+# 3. Weekday 晚高峰参数 (Gaussian) / Evening Peak Parameters
 # ============================================================
 
-NIGHT_INTENSITY = 0.2  # 夜间平峰强度 / night off-peak intensity
-NIGHT_LOAD_MIN = 50  # 夜间平峰负载下界 (kg)
-NIGHT_LOAD_MAX = 110  # 夜间平峰负载上界 (kg)
+WEEKDAY_EVENING_INTENSITY = 1.0  # 晚高峰强度 / evening peak intensity
+WEEKDAY_EVENING_LOAD_MIN = 60  # 晚高峰负载下界 (kg)
+WEEKDAY_EVENING_LOAD_MAX = 150  # 晚高峰负载上界 (kg)
+WEEKDAY_EVENING_SIGMA_RATIO = 0.30  # 晚高峰标准差比 / time spread ratio
 
-NIGHT_RATIO_ORIGIN1 = 0.45  # 一楼出发 (上行) / departures from floor 1
-NIGHT_RATIO_DEST1 = 0.45  # 抵达一楼 (下行) / arrivals to floor 1
-NIGHT_RATIO_OTHER = 0.10  # 楼层间往返 / inter-floor traffic
+WEEKDAY_EVENING_RATIO_ORIGIN1 = 0.90  # 一楼出发比例 / upward trips from floor 1
+WEEKDAY_EVENING_RATIO_DEST1 = 0.05  # 抵达一楼比例 / down trips to floor 1
+WEEKDAY_EVENING_RATIO_OTHER = 0.05  # 楼层间流动 / inter-floor movement
+
+# ============================================================
+# 4. Weekday 夜间平峰参数 (Uniform) / Night Off-Peak Parameters
+# ============================================================
+
+WEEKDAY_NIGHT_INTENSITY = 0.2  # 夜间平峰强度 / night off-peak intensity
+WEEKDAY_NIGHT_LOAD_MIN = 50  # 夜间平峰负载下界 (kg)
+WEEKDAY_NIGHT_LOAD_MAX = 110  # 夜间平峰负载上界 (kg)
+
+WEEKDAY_NIGHT_RATIO_ORIGIN1 = 0.45  # 一楼出发 (上行) / departures from floor 1
+WEEKDAY_NIGHT_RATIO_DEST1 = 0.45  # 抵达一楼 (下行) / arrivals to floor 1
+WEEKDAY_NIGHT_RATIO_OTHER = 0.10  # 楼层间往返 / inter-floor traffic
+
+# ------------------------
+# Weekend Request Generation (Overview) / 周末请求概览
+# ------------------------
+WEEKEND_DAY_INTENSITY = 0.75  # 周末白天强度 / weekend daytime intensity
+WEEKEND_DAY_LOAD_MIN = 45  # 周末白天负载下界 (kg)
+WEEKEND_DAY_LOAD_MAX = 130  # 周末白天负载上界 (kg)
+WEEKEND_DAY_RATIO_ORIGIN1 = 0.45  # 一楼出发比例
+WEEKEND_DAY_RATIO_DEST1 = 0.45  # 抵达一楼比例
+WEEKEND_DAY_RATIO_OTHER = 0.10  # 楼层间比例
+
+WEEKEND_NIGHT_INTENSITY = 0.35  # 周末夜间强度
+WEEKEND_NIGHT_LOAD_MIN = 40  # 周末夜间负载下界 (kg)
+WEEKEND_NIGHT_LOAD_MAX = 120  # 周末夜间负载上界 (kg)
+WEEKEND_NIGHT_RATIO_ORIGIN1 = 0.40
+WEEKEND_NIGHT_RATIO_DEST1 = 0.40
+WEEKEND_NIGHT_RATIO_OTHER = 0.20
 
 # ============================================================
 # 兼容保留 / Backward-compatible aliases
 # ============================================================
 
-PEAK_INTENSITY = MORNING_INTENSITY
-PEAK_LOAD_MIN = MORNING_LOAD_MIN
-PEAK_LOAD_MAX = MORNING_LOAD_MAX
-PEAK_SIGMA_RATIO = MORNING_SIGMA_RATIO
-PEAK_MORNING_RATIO_ORIGIN1 = MORNING_RATIO_ORIGIN1
-PEAK_MORNING_RATIO_DEST1 = MORNING_RATIO_DEST1
-PEAK_MORNING_RATIO_OTHER = MORNING_RATIO_OTHER
-PEAK_EVENING_RATIO_ORIGIN1 = EVENING_RATIO_ORIGIN1
-PEAK_EVENING_RATIO_DEST1 = EVENING_RATIO_DEST1
-PEAK_EVENING_RATIO_OTHER = EVENING_RATIO_OTHER
-OFFPEAK_INTENSITY = DAY_INTENSITY
-OFFPEAK_LOAD_MIN = DAY_LOAD_MIN
-OFFPEAK_LOAD_MAX = DAY_LOAD_MAX
-OFFPEAK_RATIO_ORIGIN1 = DAY_RATIO_ORIGIN1
-OFFPEAK_RATIO_DEST1 = DAY_RATIO_DEST1
-OFFPEAK_RATIO_OTHER = DAY_RATIO_OTHER
+WEEKDAY_PEAK_INTENSITY = WEEKDAY_MORNING_INTENSITY
+WEEKDAY_PEAK_LOAD_MIN = WEEKDAY_MORNING_LOAD_MIN
+WEEKDAY_PEAK_LOAD_MAX = WEEKDAY_MORNING_LOAD_MAX
+WEEKDAY_PEAK_SIGMA_RATIO = WEEKDAY_MORNING_SIGMA_RATIO
+WEEKDAY_PEAK_MORNING_RATIO_ORIGIN1 = WEEKDAY_MORNING_RATIO_ORIGIN1
+WEEKDAY_PEAK_MORNING_RATIO_DEST1 = WEEKDAY_MORNING_RATIO_DEST1
+WEEKDAY_PEAK_MORNING_RATIO_OTHER = WEEKDAY_MORNING_RATIO_OTHER
+WEEKDAY_PEAK_EVENING_RATIO_ORIGIN1 = WEEKDAY_EVENING_RATIO_ORIGIN1
+WEEKDAY_PEAK_EVENING_RATIO_DEST1 = WEEKDAY_EVENING_RATIO_DEST1
+WEEKDAY_PEAK_EVENING_RATIO_OTHER = WEEKDAY_EVENING_RATIO_OTHER
+WEEKDAY_OFFPEAK_INTENSITY = WEEKDAY_DAY_INTENSITY
+WEEKDAY_OFFPEAK_LOAD_MIN = WEEKDAY_DAY_LOAD_MIN
+WEEKDAY_OFFPEAK_LOAD_MAX = WEEKDAY_DAY_LOAD_MAX
+WEEKDAY_OFFPEAK_RATIO_ORIGIN1 = WEEKDAY_DAY_RATIO_ORIGIN1
+WEEKDAY_OFFPEAK_RATIO_DEST1 = WEEKDAY_DAY_RATIO_DEST1
+WEEKDAY_OFFPEAK_RATIO_OTHER = WEEKDAY_DAY_RATIO_OTHER
 
 # ============================================================
 # 3. 时段定义 (小时:分钟) / Period Definitions (HH:MM)
 # ============================================================
 
-PEAK_MORNING_START = (7, 0)  # 早高峰开始 / morning start
-PEAK_MORNING_END = (10, 30)  # 早高峰结束 / morning end
+WEEKDAY_PEAK_MORNING_START = (7, 0)  # 早高峰开始 / morning start
+WEEKDAY_PEAK_MORNING_END = (10, 30)  # 早高峰结束 / morning end
 
-OFFPEAK_DAY_START = (10, 30)  # 白天平峰开始 / daytime off-peak start
-OFFPEAK_DAY_END = (17, 0)  # 白天平峰结束 / daytime off-peak end
+WEEKDAY_OFFPEAK_DAY_START = (10, 30)  # 白天平峰开始 / daytime off-peak start
+WEEKDAY_OFFPEAK_DAY_END = (17, 0)  # 白天平峰结束 / daytime off-peak end
 
-PEAK_EVENING_START = (17, 0)  # 晚高峰开始 / evening start
-PEAK_EVENING_END = (21, 0)  # 晚高峰结束 / evening end
+WEEKDAY_PEAK_EVENING_START = (17, 0)  # 晚高峰开始 / evening start
+WEEKDAY_PEAK_EVENING_END = (21, 0)  # 晚高峰结束 / evening end
 
-OFFPEAK_NIGHT_START = (21, 0)  # 夜间平峰开始 / night off-peak start
-OFFPEAK_NIGHT_END = (7 + 24, 0)  # 夜间平峰结束 (跨日) / night off-peak end (next day)
+WEEKDAY_OFFPEAK_NIGHT_START = (21, 0)  # 夜间平峰开始 / night off-peak start
+WEEKDAY_OFFPEAK_NIGHT_END = (
+    7 + 24,
+    0,
+)  # 夜间平峰结束 (跨日) / night off-peak end (next day)
 
-PEAK_MORNING_MU = "8:50"  # 早高峰中心 / morning peak center
-PEAK_EVENING_MU = "18:30"  # 晚高峰中心 / evening peak center
+WEEKDAY_PEAK_MORNING_MU = "8:50"  # 早高峰中心 / morning peak center
+WEEKDAY_PEAK_EVENING_MU = "18:30"  # 晚高峰中心 / evening peak center
+
+# 周末时段定义 / Weekend period definitions
+WEEKEND_DAY_START = (9, 0)
+WEEKEND_DAY_END = (21, 0)
+WEEKEND_NIGHT_START = (21, 0)
+WEEKEND_NIGHT_END = (9 + 24, 0)
 
 # ============================================================
 # 自动计算时段权重 / Auto-computed period weights
@@ -196,14 +225,27 @@ PEAK_EVENING_MU = "18:30"  # 晚高峰中心 / evening peak center
 
 DAY_DURATION = 24 * 3600  # 一天总秒数 / seconds per day
 
-_duration_morning = duration_seconds(PEAK_MORNING_START, PEAK_MORNING_END)
-_duration_day = duration_seconds(OFFPEAK_DAY_START, OFFPEAK_DAY_END)
-_duration_evening = duration_seconds(PEAK_EVENING_START, PEAK_EVENING_END)
-_duration_night = duration_seconds(OFFPEAK_NIGHT_START, OFFPEAK_NIGHT_END)
+_duration_morning = duration_seconds(
+    WEEKDAY_PEAK_MORNING_START, WEEKDAY_PEAK_MORNING_END
+)
+_duration_day = duration_seconds(WEEKDAY_OFFPEAK_DAY_START, WEEKDAY_OFFPEAK_DAY_END)
+_duration_evening = duration_seconds(
+    WEEKDAY_PEAK_EVENING_START, WEEKDAY_PEAK_EVENING_END
+)
+_duration_night = duration_seconds(
+    WEEKDAY_OFFPEAK_NIGHT_START, WEEKDAY_OFFPEAK_NIGHT_END
+)
 
 _total = _duration_morning + _duration_day + _duration_evening + _duration_night
 
-PEAK_MORNING_RATIO = _duration_morning / _total  # 早高峰权重 / morning share
-OFFPEAK_DAY_RATIO = _duration_day / _total  # 白天平峰权重 / daytime share
-PEAK_EVENING_RATIO = _duration_evening / _total  # 晚高峰权重 / evening share
-OFFPEAK_NIGHT_RATIO = _duration_night / _total  # 夜间平峰权重 / night share
+WEEKDAY_PEAK_MORNING_RATIO = _duration_morning / _total  # 早高峰权重 / morning share
+WEEKDAY_OFFPEAK_DAY_RATIO = _duration_day / _total  # 白天平峰权重 / daytime share
+WEEKDAY_PEAK_EVENING_RATIO = _duration_evening / _total  # 晚高峰权重 / evening share
+WEEKDAY_OFFPEAK_NIGHT_RATIO = _duration_night / _total  # 夜间平峰权重 / night share
+
+_weekend_day_duration = duration_seconds(WEEKEND_DAY_START, WEEKEND_DAY_END)
+_weekend_night_duration = duration_seconds(WEEKEND_NIGHT_START, WEEKEND_NIGHT_END)
+_weekend_total = _weekend_day_duration + _weekend_night_duration
+
+WEEKEND_DAY_RATIO = _weekend_day_duration / _weekend_total
+WEEKEND_NIGHT_RATIO = _weekend_night_duration / _weekend_total

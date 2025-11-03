@@ -19,6 +19,7 @@ def generate_offpeak_uniform(
     load_min: float = 50.0,
     load_max: float = 110.0,
     seed_offset: int = 0,
+    seed_base: int | None = None,
 ):
     """
     Generate off-peak requests with uniform arrival times / 生成平峰期均匀分布的请求。
@@ -28,7 +29,8 @@ def generate_offpeak_uniform(
       - ratio_other : origin,dest∈[2..F] 且 origin!=dest 的比例（楼层间）
       - intensity   : 强度缩放系数，实际请求数 = floor(num_requests * intensity)
     """
-    random.seed(cfg.SIM_RANDOM_SEED + seed_offset)
+    base = cfg.SIM_RANDOM_SEED if seed_base is None else seed_base
+    random.seed(base + seed_offset)
     n = max(0, int(num_requests * max(0.0, intensity)))
     c1, c2 = validate_ratios(ratio_origin1, ratio_dest1, ratio_other)
 
@@ -66,12 +68,14 @@ def generate_peak_gaussian(
     load_min: float = 60.0,
     load_max: float = 150.0,
     seed_offset: int = 100,
+    seed_base: int | None = None,
 ):
     """
     Generate peak-period requests using truncated Gaussian arrival / 生成截断高斯分布的高峰期请求。
     其它参数含义与平峰函数一致；sigma = (end-start) * sigma_ratio。
     """
-    random.seed(cfg.SIM_RANDOM_SEED + seed_offset)
+    base = cfg.SIM_RANDOM_SEED if seed_base is None else seed_base
+    random.seed(base + seed_offset)
     n = max(0, int(num_requests * max(0.0, intensity)))
     c1, c2 = validate_ratios(ratio_origin1, ratio_dest1, ratio_other)
 
@@ -96,73 +100,120 @@ def generate_peak_gaussian(
     return reqs
 
 
-def generate_requests_day(total_requests: int):
+def generate_requests_weekday(total_requests: int, *, seed_shift: int = 0):
     """Simulate a full-day demand profile / 生成完整一天的乘梯请求序列。"""
-    total_morning = int(total_requests * cfg.PEAK_MORNING_RATIO)
-    total_day = int(total_requests * cfg.OFFPEAK_DAY_RATIO)
-    total_evening = int(total_requests * cfg.PEAK_EVENING_RATIO)
-    total_night = int(total_requests * cfg.OFFPEAK_NIGHT_RATIO)
+    seed_base = cfg.SIM_RANDOM_SEED + seed_shift
+    total_morning = int(total_requests * cfg.WEEKDAY_PEAK_MORNING_RATIO)
+    total_day = int(total_requests * cfg.WEEKDAY_OFFPEAK_DAY_RATIO)
+    total_evening = int(total_requests * cfg.WEEKDAY_PEAK_EVENING_RATIO)
+    total_night = int(total_requests * cfg.WEEKDAY_OFFPEAK_NIGHT_RATIO)
 
     morning = generate_peak_gaussian(
         num_requests=total_morning,
-        start_time=cfg.h2s(*cfg.PEAK_MORNING_START),
-        end_time=cfg.h2s(*cfg.PEAK_MORNING_END),
-        mu_time=cfg.h2s(cfg.PEAK_MORNING_MU),
-        sigma_ratio=cfg.MORNING_SIGMA_RATIO,
-        intensity=cfg.MORNING_INTENSITY,
-        ratio_origin1=cfg.MORNING_RATIO_ORIGIN1,
-        ratio_dest1=cfg.MORNING_RATIO_DEST1,
-        ratio_other=cfg.MORNING_RATIO_OTHER,
-        load_min=cfg.MORNING_LOAD_MIN,
-        load_max=cfg.MORNING_LOAD_MAX,
+        start_time=cfg.h2s(*cfg.WEEKDAY_PEAK_MORNING_START),
+        end_time=cfg.h2s(*cfg.WEEKDAY_PEAK_MORNING_END),
+        mu_time=cfg.h2s(cfg.WEEKDAY_PEAK_MORNING_MU),
+        sigma_ratio=cfg.WEEKDAY_MORNING_SIGMA_RATIO,
+        intensity=cfg.WEEKDAY_MORNING_INTENSITY,
+        ratio_origin1=cfg.WEEKDAY_MORNING_RATIO_ORIGIN1,
+        ratio_dest1=cfg.WEEKDAY_MORNING_RATIO_DEST1,
+        ratio_other=cfg.WEEKDAY_MORNING_RATIO_OTHER,
+        load_min=cfg.WEEKDAY_MORNING_LOAD_MIN,
+        load_max=cfg.WEEKDAY_MORNING_LOAD_MAX,
         seed_offset=100,
+        seed_base=seed_base,
     )
 
     day = generate_offpeak_uniform(
         num_requests=total_day,
-        start_time=cfg.h2s(*cfg.OFFPEAK_DAY_START),
-        end_time=cfg.h2s(*cfg.OFFPEAK_DAY_END),
-        intensity=cfg.DAY_INTENSITY,
-        ratio_origin1=cfg.DAY_RATIO_ORIGIN1,
-        ratio_dest1=cfg.DAY_RATIO_DEST1,
-        ratio_other=cfg.DAY_RATIO_OTHER,
-        load_min=cfg.DAY_LOAD_MIN,
-        load_max=cfg.DAY_LOAD_MAX,
+        start_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_DAY_START),
+        end_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_DAY_END),
+        intensity=cfg.WEEKDAY_DAY_INTENSITY,
+        ratio_origin1=cfg.WEEKDAY_DAY_RATIO_ORIGIN1,
+        ratio_dest1=cfg.WEEKDAY_DAY_RATIO_DEST1,
+        ratio_other=cfg.WEEKDAY_DAY_RATIO_OTHER,
+        load_min=cfg.WEEKDAY_DAY_LOAD_MIN,
+        load_max=cfg.WEEKDAY_DAY_LOAD_MAX,
         seed_offset=200,
+        seed_base=seed_base,
     )
 
     evening = generate_peak_gaussian(
         num_requests=total_evening,
-        start_time=cfg.h2s(*cfg.PEAK_EVENING_START),
-        end_time=cfg.h2s(*cfg.PEAK_EVENING_END),
-        mu_time=cfg.h2s(cfg.PEAK_EVENING_MU),
-        sigma_ratio=cfg.EVENING_SIGMA_RATIO,
-        intensity=cfg.EVENING_INTENSITY,
-        ratio_origin1=cfg.EVENING_RATIO_ORIGIN1,
-        ratio_dest1=cfg.EVENING_RATIO_DEST1,
-        ratio_other=cfg.EVENING_RATIO_OTHER,
-        load_min=cfg.EVENING_LOAD_MIN,
-        load_max=cfg.EVENING_LOAD_MAX,
+        start_time=cfg.h2s(*cfg.WEEKDAY_PEAK_EVENING_START),
+        end_time=cfg.h2s(*cfg.WEEKDAY_PEAK_EVENING_END),
+        mu_time=cfg.h2s(cfg.WEEKDAY_PEAK_EVENING_MU),
+        sigma_ratio=cfg.WEEKDAY_EVENING_SIGMA_RATIO,
+        intensity=cfg.WEEKDAY_EVENING_INTENSITY,
+        ratio_origin1=cfg.WEEKDAY_EVENING_RATIO_ORIGIN1,
+        ratio_dest1=cfg.WEEKDAY_EVENING_RATIO_DEST1,
+        ratio_other=cfg.WEEKDAY_EVENING_RATIO_OTHER,
+        load_min=cfg.WEEKDAY_EVENING_LOAD_MIN,
+        load_max=cfg.WEEKDAY_EVENING_LOAD_MAX,
         seed_offset=300,
+        seed_base=seed_base,
     )
 
     night = generate_offpeak_uniform(
         num_requests=total_night,
-        start_time=cfg.h2s(*cfg.OFFPEAK_NIGHT_START),
-        end_time=cfg.h2s(*cfg.OFFPEAK_NIGHT_END),
-        intensity=cfg.NIGHT_INTENSITY,
-        ratio_origin1=cfg.NIGHT_RATIO_ORIGIN1,
-        ratio_dest1=cfg.NIGHT_RATIO_DEST1,
-        ratio_other=cfg.NIGHT_RATIO_OTHER,
-        load_min=cfg.NIGHT_LOAD_MIN,
-        load_max=cfg.NIGHT_LOAD_MAX,
+        start_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_NIGHT_START),
+        end_time=cfg.h2s(*cfg.WEEKDAY_OFFPEAK_NIGHT_END),
+        intensity=cfg.WEEKDAY_NIGHT_INTENSITY,
+        ratio_origin1=cfg.WEEKDAY_NIGHT_RATIO_ORIGIN1,
+        ratio_dest1=cfg.WEEKDAY_NIGHT_RATIO_DEST1,
+        ratio_other=cfg.WEEKDAY_NIGHT_RATIO_OTHER,
+        load_min=cfg.WEEKDAY_NIGHT_LOAD_MIN,
+        load_max=cfg.WEEKDAY_NIGHT_LOAD_MAX,
         seed_offset=400,
+        seed_base=seed_base,
     )
 
     # 统一按到达时间排序 / merge and sort by arrival time
     requests = sorted(morning + day + evening + night, key=lambda r: r.arrival_time)
 
     # 统一重新编号，确保请求 ID 唯一 / reindex IDs to guarantee uniqueness.
+    for new_id, req in enumerate(requests, start=1):
+        req.id = new_id
+
+    return requests
+
+
+def generate_requests_weekend(total_requests: int, *, seed_shift: int = 0):
+    """Simulate a weekend profile with day/night uniform segments / 生成周末日请求。"""
+    seed_base = cfg.SIM_RANDOM_SEED + seed_shift
+    total_day = int(total_requests * cfg.WEEKEND_DAY_RATIO)
+    total_night = max(0, total_requests - total_day)
+
+    day = generate_offpeak_uniform(
+        num_requests=total_day,
+        start_time=cfg.h2s(*cfg.WEEKEND_DAY_START),
+        end_time=cfg.h2s(*cfg.WEEKEND_DAY_END),
+        intensity=cfg.WEEKEND_DAY_INTENSITY,
+        ratio_origin1=cfg.WEEKEND_DAY_RATIO_ORIGIN1,
+        ratio_dest1=cfg.WEEKEND_DAY_RATIO_DEST1,
+        ratio_other=cfg.WEEKEND_DAY_RATIO_OTHER,
+        load_min=cfg.WEEKEND_DAY_LOAD_MIN,
+        load_max=cfg.WEEKEND_DAY_LOAD_MAX,
+        seed_offset=500,
+        seed_base=seed_base,
+    )
+
+    night = generate_offpeak_uniform(
+        num_requests=total_night,
+        start_time=cfg.h2s(*cfg.WEEKEND_NIGHT_START),
+        end_time=cfg.h2s(*cfg.WEEKEND_NIGHT_END),
+        intensity=cfg.WEEKEND_NIGHT_INTENSITY,
+        ratio_origin1=cfg.WEEKEND_NIGHT_RATIO_ORIGIN1,
+        ratio_dest1=cfg.WEEKEND_NIGHT_RATIO_DEST1,
+        ratio_other=cfg.WEEKEND_NIGHT_RATIO_OTHER,
+        load_min=cfg.WEEKEND_NIGHT_LOAD_MIN,
+        load_max=cfg.WEEKEND_NIGHT_LOAD_MAX,
+        seed_offset=600,
+        seed_base=seed_base,
+    )
+
+    requests = sorted(day + night, key=lambda r: r.arrival_time)
+
     for new_id, req in enumerate(requests, start=1):
         req.id = new_id
 

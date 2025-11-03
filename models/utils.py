@@ -88,16 +88,8 @@ def ensure_directory(path: str):
     os.makedirs(path, exist_ok=True)
 
 
-def plot_elevator_movements(
-    elevators,
-    filename=os.path.join(DEFAULT_PLOT_DIR, "elevator_schedule.png"),
-):
-    """
-    Plot elevator service schedule (floor vs. task index) /
-    绘制电梯服务序列（楼层-任务索引），展示各电梯执行顺序。
-    """
+def _ensure_matplotlib():
     try:
-        # Limit BLAS/OpenMP threads / 限制 BLAS 与 OpenMP 线程数量以保持运行稳定。
         os.environ.setdefault("OMP_NUM_THREADS", "1")
         os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
         os.environ.setdefault("MKL_NUM_THREADS", "1")
@@ -108,129 +100,160 @@ def plot_elevator_movements(
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+
+        return plt
     except Exception as exc:
         print(f"[Plot Skipped] {exc}")
+        return None
+
+
+def _collect_global_entries(elevators):
+    entries = []
+    for elev in elevators:
+        for req in getattr(elev, "served_requests", []):
+            origin = getattr(req, "origin", None)
+            destination = getattr(req, "destination", None)
+            if origin is None or destination is None:
+                continue
+            start_time = getattr(req, "pickup_time", None)
+            if start_time is None:
+                start_time = getattr(req, "origin_arrival_time", None)
+            if start_time is None:
+                start_time = getattr(req, "arrival_time", 0.0)
+            entries.append((float(start_time), elev.id, req))
+    entries.sort(
+        key=lambda item: (
+            item[0],
+            getattr(item[2], "arrival_time", 0.0),
+            getattr(item[2], "id", 0),
+        )
+    )
+    return entries
+
+
+def plot_elevator_movements(
+    elevators,
+    filename: str | None = None,
+    *,
+    strategy_label: str | None = None,
+) -> None:
+    """
+    Global task-order view (index vs floor) / 全局任务顺序视图（索引-楼层）。
+    """
+    plt = _ensure_matplotlib()
+    if plt is None:
         return
 
+    entries = _collect_global_entries(elevators)
+    if not entries:
+        print("[Plot Skipped] No served requests to plot (global order).")
+        return
+
+    if filename is None:
+        filename = os.path.join(DEFAULT_PLOT_DIR, "elevator_schedule_global.png")
+
+    label = strategy_label or "Strategy"
     ensure_directory(os.path.dirname(filename))
-    plt.figure(figsize=(20, 10))
+    plt.figure(figsize=(25.6, 14.4))
     colors = ["C0", "C1", "C2", "C3", "C4", "C5"]
+    color_map = {elev.id: colors[i % len(colors)] for i, elev in enumerate(elevators)}
 
-    for i, elev in enumerate(elevators):
-        floors = []
-        tasks = []
-        current_task = 0
+    series: dict[int, tuple[list[float], list[float]]] = {}
+    for idx, (_, elev_id, req) in enumerate(entries):
+        origin = getattr(req, "origin", None)
+        destination = getattr(req, "destination", None)
+        if origin is None or destination is None:
+            continue
+        xs, ys = series.setdefault(elev_id, ([], []))
+        xs.extend([idx, idx + 1])
+        ys.extend([origin, destination])
 
-        for req in elev.served_requests:
-            floors += [req.origin, req.destination]
-            tasks += [current_task, current_task + 1]
-            current_task += 1
+    for elev_id, (xs, ys) in series.items():
+        if not xs:
+            continue
+        plt.plot(
+            xs,
+            ys,
+            color=color_map[elev_id],
+            linewidth=1.2,
+            alpha=0.85,
+            label=f"Elevator {elev_id}",
+        )
 
-        if floors:
-            plt.plot(
-                tasks,
-                floors,
-                marker="o",
-                color=colors[i % len(colors)],
-                label=f"Elevator {elev.id}",
-            )
-
-    plt.xlabel("Task Index")
+    plt.xlabel("Global Task Index")
     plt.ylabel("Floor Level")
-    plt.title("Elevator Service Schedule (Baseline Strategy)")
-    plt.legend()
-    plt.grid(True)
+    plt.title(f"Global Service Sequence ({label})")
+    if series:
+        plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.35)
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
-    print(f"[Plot Saved] Elevator movement plot saved to: {filename}")
+    print(f"[Plot Saved] Global sequence plot saved to: {filename}")
 
 
 def plot_elevator_movements_time(
     elevators,
-    filename=os.path.join(DEFAULT_PLOT_DIR, "elevator_schedule_time.png"),
-):
-    """Plot elevator services over time / 绘制以时间为横轴的电梯运行轨迹。"""
+    filename: str | None = None,
+    *,
+    strategy_label: str | None = None,
+) -> None:
+    """
+    Global service timeline (time vs floor) / 全局服务时间线（时间-楼层）。
+    """
+    plt = _ensure_matplotlib()
+    if plt is None:
+        return
+    from matplotlib.ticker import FuncFormatter
 
-    try:
-        os.environ.setdefault("OMP_NUM_THREADS", "1")
-        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-        os.environ.setdefault("MKL_NUM_THREADS", "1")
-        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-        os.environ.setdefault("KMP_AFFINITY", "disabled")
-
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.ticker import FuncFormatter
-    except Exception as exc:
-        print(f"[Plot Skipped] {exc}")
+    entries = _collect_global_entries(elevators)
+    if not entries:
+        print("[Plot Skipped] No served requests to plot (global timeline).")
         return
 
+    if filename is None:
+        filename = os.path.join(DEFAULT_PLOT_DIR, "elevator_schedule_time_global.png")
+
+    label = strategy_label or "Strategy"
     ensure_directory(os.path.dirname(filename))
-    plt.figure(figsize=(20, 10))
+    plt.figure(figsize=(25.6, 14.4))
     colors = ["C0", "C1", "C2", "C3", "C4", "C5"]
+    color_map = {elev.id: colors[i % len(colors)] for i, elev in enumerate(elevators)}
+    legend_added = set()
 
-    for i, elev in enumerate(elevators):
-        color = colors[i % len(colors)]
-        requests = sorted(
-            elev.served_requests,
-            key=lambda r: (
-                getattr(r, "origin_arrival_time", None)
-                or getattr(r, "pickup_time", float("inf"))
-            ),
-        )
-
-        if not requests:
+    for start_time, elev_id, req in entries:
+        origin = getattr(req, "origin", None)
+        destination = getattr(req, "destination", None)
+        if origin is None or destination is None:
             continue
-
-        first_req = requests[0]
-        start_time = (
-            getattr(first_req, "origin_arrival_time", None)
-            or getattr(first_req, "pickup_time", None)
-            or 0.0
+        pickup = getattr(req, "pickup_time", None)
+        if pickup is None:
+            pickup = getattr(req, "origin_arrival_time", None)
+        if pickup is None:
+            pickup = start_time
+        dropoff = getattr(req, "destination_arrival_time", None)
+        if dropoff is None:
+            dropoff = getattr(req, "dropoff_time", None)
+        if dropoff is None:
+            dropoff = pickup
+        color = color_map.get(elev_id, "C7")
+        label_entry = (
+            f"Elevator {elev_id}" if elev_id not in legend_added else "_nolegend_"
         )
-        timeline = [(start_time, getattr(elev, "initial_floor", elev.floor))]
-
-        def append_point(time_value, floor_value):
-            if time_value is None or floor_value is None:
-                return
-            last_time, last_floor = timeline[-1]
-            if time_value == last_time and floor_value == last_floor:
-                return
-            timeline.append((time_value, floor_value))
-
-        for req in requests:
-            arrival_origin = getattr(req, "origin_arrival_time", None)
-            pickup_time = getattr(req, "pickup_time", None)
-            dest_arrival = getattr(req, "destination_arrival_time", None)
-            dropoff_time = getattr(req, "dropoff_time", None)
-
-            if arrival_origin is None:
-                arrival_origin = pickup_time
-            if dest_arrival is None:
-                dest_arrival = dropoff_time
-
-            append_point(arrival_origin, req.origin)
-
-            if pickup_time is not None:
-                append_point(pickup_time, req.origin)
-
-            append_point(dest_arrival, req.destination)
-
-            if dropoff_time is not None:
-                append_point(dropoff_time, req.destination)
-
-        xs, ys = zip(*timeline)
         plt.plot(
-            xs, ys, color=color, linewidth=1.6, alpha=0.9, label=f"Elevator {elev.id}"
+            [pickup, dropoff],
+            [origin, destination],
+            color=color,
+            marker="o",
+            alpha=0.9,
+            linewidth=1.4,
+            label=label_entry,
         )
-        plt.scatter(xs, ys, color=color, s=12)
+        legend_added.add(elev_id)
 
-    plt.xlabel("Time of Day")
+    plt.xlabel("Time of Day (s)")
     plt.ylabel("Floor Level")
-    plt.title("Elevator Service Timeline (Baseline Strategy)")
+    plt.title(f"Global Service Timeline ({label})")
     ax = plt.gca()
 
     def _format_hhmm(x, pos):
@@ -240,12 +263,14 @@ def plot_elevator_movements_time(
         return f"{hour:02d}:{minute:02d}"
 
     ax.xaxis.set_major_formatter(FuncFormatter(_format_hhmm))
-    plt.legend()
-    plt.grid(True, linestyle="--", alpha=0.4)
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.35)
     plt.tight_layout()
     plt.savefig(filename)
     plt.close()
-    print(f"[Plot Saved] Elevator timeline plot saved to: {filename}")
+    print(f"[Plot Saved] Global timeline plot saved to: {filename}")
 
 
 def plot_wait_distribution(
@@ -256,19 +281,8 @@ def plot_wait_distribution(
     Plot wait-time histograms for multiple strategies / 绘制多策略等待时间分布直方图。
     wait_data expects (label, waits) pairs / 输入为 (策略名称, 等待时间序列)。
     """
-    try:
-        os.environ.setdefault("OMP_NUM_THREADS", "1")
-        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-        os.environ.setdefault("MKL_NUM_THREADS", "1")
-        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-        os.environ.setdefault("KMP_AFFINITY", "disabled")
-
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-    except Exception as exc:
-        print(f"[Plot Skipped] {exc}")
+    plt = _ensure_matplotlib()
+    if plt is None:
         return
 
     series = [
@@ -371,10 +385,10 @@ def log_results(
                 passenger_total_time, passenger_wait_time, passenger_in_cab_time
             )
         )
-        f.write("Best-case (idealized) reference:\n")
+        f.write("Theoretical lower bound (idealized) reference:\n")
         f.write(
             "  Wait: {wait:.2f} s (penalty {penalty:.2f}) | "
-            "In-cab: {time:.2f} s | Energy: {energy:.2f} J | "
+            "Ride: {time:.2f} s | Running Energy LB: {energy:.2f} J | "
             "Cost: {cost:.2f}\n\n".format(
                 wait=theoretical_wait_time,
                 penalty=theoretical_wait_penalty,
